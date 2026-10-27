@@ -53,7 +53,8 @@ def run_simulation(waypoints, controller="computed_torque", gains=None,
                    gravity_comp=True, t_seg=1.2, hold=0.6, hz=30,
                    plant=None, ctrl=None, disturbance=None, traj_mode="joint",
                    friction=0.0, tau_max=0.0, control_rate=0.0, noise=0.0,
-                   noise_seed=0, force_task=None, robot=None):
+                   noise_seed=0, force_task=None, robot=None,
+                   null_obj=None, null_gain=1.0):
     """관절 경유점(rad)을 제어기로 순회. → {t, theta, tcp, error, torque, qdot, ...}.
 
     궤적생성(traj_mode)과 제어기는 직교(독립):
@@ -79,7 +80,8 @@ def run_simulation(waypoints, controller="computed_torque", gains=None,
     elif controller == "hybrid":
         result = _run_hybrid(WP, gains, hz, plant, force_task, robot)
     elif controller in VELOCITY_CONTROLLERS:
-        result = _run_velocity(WP, ref, T, controller, gains, hz, robot)
+        result = _run_velocity(WP, ref, T, controller, gains, hz, robot,
+                               null_obj, null_gain)
     else:
         result = _run_torque(WP, ref, T, controller, gains, gravity_comp, hz,
                              plant, ctrl, disturbance, friction, tau_max,
@@ -489,13 +491,38 @@ def _run_torque(WP, ref, T, controller, gains, gravity_comp, hz,
 # ----------------------------------------------------------------------
 #  기구학 plant — 속도 입력 (resolved-rate, MR §11.3)
 # ----------------------------------------------------------------------
-def _run_velocity(WP, ref, T, controller, gains, hz, robot):
+def null_gradient(robot, th, mode, k0):
+    """부가목표 H 의 관절공간 그래디언트 ∇H (EE 무관, 널공간 투영 전 원시 방향).
+    리던던시(여유 DOF) 해소에 쓴다 — 널공간 투영 후 EE 는 안 건드린다.
+      posture        : ∇H = −(θ−θ_ready)  → 편한 자세로 수렴(joint centering)
+      manipulability : ∇H = ∇w  (수치 중앙차분) → 특이점에서 멀어짐(w=√det(JJᵀ)↑)
+    """
+    if mode == "posture":
+        return -k0 * (th - robot.ready)
+    if mode == "manipulability":
+        h = 1e-4
+        grad = np.zeros(robot.n)
+        for i in range(robot.n):
+            tp = th.copy(); tp[i] += h
+            tm = th.copy(); tm[i] -= h
+            grad[i] = (robot.manipulability(tp)["w"]
+                       - robot.manipulability(tm)["w"]) / (2.0 * h)
+        return k0 * grad
+    return np.zeros(robot.n)
+
+
+def _run_velocity(WP, ref, T, controller, gains, hz, robot,
+                  null_obj=None, null_gain=1.0):
     """속도제어: θ̇=제어출력, θ만 적분(1차계). 동역학·중력 불필요 → RK45.
 
     joint_velocity (§11.3.2): θ̇ = θ̇_d + Kp(θ_d−θ) + Ki∫(θ_d−θ)
     resolved_rate   (§11.3.3): Vb = Ad_{X⁻¹X_d}·V_d + Kp·Xe + Ki∫Xe,  θ̇ = J†_b·Vb
                                Xe = log(X⁻¹X_d) (body twist 오차)
     게인은 1차계라 스케일이 작다(≈ 1/시정수). kd 없음.
+
+    널공간(여유 DOF) 해소: θ̇ = J†Vb + (I−J†J)·θ̇₀ (resolved_rate 한정).
+    투영 (I−J†J) 이 θ̇₀ 의 EE 영향분을 제거 → 주작업 무손상. 6-DOF 는 J 정방이라
+    J†J=I → 투영≈0 → 완전 불변. θ̇₀ 는 null_gradient(부가목표).
     """
     N = robot.n
     Kp = float(gains.get("kp", 2.0))
@@ -503,6 +530,7 @@ def _run_velocity(WP, ref, T, controller, gains, hz, robot):
     use_I = Ki != 0.0
     is_rr = controller == "resolved_rate"
     idim = 6 if is_rr else N             # 적분항 차원 (task=6, joint=n)
+    null_mode = null_obj if is_rr else None    # 널공간은 resolved_rate(여유 task)만
 
     def law(th, th_d, dth_d, I):
         """제어출력 θ̇ 와 적분항 integrand 반환."""
@@ -514,7 +542,13 @@ def _run_velocity(WP, ref, T, controller, gains, hz, robot):
         Xe = SE3.log(Tdiff)[0]                          # body twist 오차
         Vd = robot.jacobian_body(th_d) @ dth_d           # 피드포워드 트위스트(frame {d})
         Vb = SE3.Adjoint(Tdiff) @ Vd + Kp * Xe + Ki * I
-        return robot.dls_inv(robot.jacobian_body(th)) @ Vb, Xe
+        Jb = robot.jacobian_body(th)
+        Jpinv = robot.dls_inv(Jb)
+        qd = Jpinv @ Vb
+        if null_mode:                                   # 널공간 부가목표(여유 DOF)
+            qd0 = null_gradient(robot, th, null_mode, null_gain)
+            qd = qd + (np.eye(N) - Jpinv @ Jb) @ qd0
+        return qd, Xe
 
     def rhs(t, x):
         th = x[:N]

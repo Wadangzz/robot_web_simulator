@@ -1,9 +1,10 @@
 """기구학 비즈니스 로직 (IK / FK). 로봇은 레지스트리에서 robot_id 로 해석."""
 import numpy as np
 from fastapi import HTTPException
-from app.core import robot_registry as registry
-from app.core.robot_math import SE3
-from app.schemas import IKRequest, IKResponse, FKRequest, FKResponse
+from motion_core.robots import robot_registry as registry
+from motion_core.robots.robot_math import SE3
+
+from app.schemas import FKRequest, FKResponse, IKRequest, IKResponse
 
 
 def _robot(robot_id):

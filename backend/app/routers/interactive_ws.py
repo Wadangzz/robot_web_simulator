@@ -13,8 +13,8 @@ InteractiveSession 을 들고 ~60Hz 루프로 step → θ 스트리밍한다. pr
 import asyncio
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from motion_core.robots import robot_registry as registry
 
-from app.core import robot_registry as registry
 from app.interactive import InteractiveSession
 
 router = APIRouter()

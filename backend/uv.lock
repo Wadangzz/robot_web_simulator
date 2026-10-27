@@ -866,6 +866,32 @@ wheels = [
 ]
 
 [[package]]
+name = "motion-core"
+version = "0.0.1"
+source = { editable = "../../motion-core" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "casadi", marker = "extra == 'opt'", specifier = ">=3.6" },
+    { name = "jupyter", marker = "extra == 'bench'" },
+    { name = "matplotlib", marker = "extra == 'bench'", specifier = ">=3.8" },
+    { name = "motion-core", extras = ["fast", "robot", "validation", "bench"], marker = "extra == 'dev'" },
+    { name = "mujoco", marker = "extra == 'validation'", specifier = ">=3.1" },
+    { name = "numba", marker = "extra == 'fast'", specifier = ">=0.59" },
+    { name = "numpy", specifier = ">=1.26" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
+    { name = "pyyaml", marker = "extra == 'bench'", specifier = ">=6.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
+    { name = "scipy", specifier = ">=1.11" },
+    { name = "yourdfpy", marker = "extra == 'robot'", specifier = ">=0.0.56" },
+]
+provides-extras = ["fast", "robot", "validation", "opt", "bench", "dev"]
+
+[[package]]
 name = "networkx"
 version = "3.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1790,6 +1816,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "fast-simplification" },
     { name = "fastapi" },
+    { name = "motion-core" },
     { name = "numba" },
     { name = "numpy" },
     { name = "pyside6" },
@@ -1816,6 +1843,7 @@ dev = [
 requires-dist = [
     { name = "fast-simplification", specifier = ">=0.1.13" },
     { name = "fastapi", specifier = ">=0.137.1" },
+    { name = "motion-core", editable = "../../motion-core" },
     { name = "numba", specifier = ">=0.65.1" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "pyside6", specifier = ">=6.11.1" },

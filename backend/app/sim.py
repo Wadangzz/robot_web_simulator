@@ -12,9 +12,9 @@ manipulability·robot.n·robot.dyn_args·robot.gravity 를 통해 기구학·동
 run_simulation(robot=None) 이면 기본 로봇 UR5 를 레지스트리에서 가져온다(데모/하위호환).
 """
 import numpy as np
+from motion_core.robots import dynamics_fast as df  # numba JIT RNE (~14x)
+from motion_core.robots.robot_math import SE3, SO3, quintic_time_scaling
 from scipy.integrate import solve_ivp
-from app.core.robot_math import SE3, SO3, quintic_time_scaling
-from app.core import dynamics_fast as df       # numba JIT RNE (numpy 대비 ~14x)
 
 # --- 공통 적분/정착/발산 상수 ---
 SETTLE_MAX = 2.0        # 모션 종료 후 평형 대기(s) — 속도제어 등 고정창 경로용
@@ -31,7 +31,7 @@ VELOCITY_CONTROLLERS = ("joint_velocity", "resolved_rate")
 
 def _default_robot():
     """기본 로봇(UR5) — robot 미지정 시 사용. 레지스트리 캐시."""
-    from app.core import robot_registry as registry
+    from motion_core.robots import robot_registry as registry
     return registry.get_robot("ur5")
 
 
@@ -740,7 +740,7 @@ def _make_surface(ft):
     """
     shape = ft.get("shape", "plane")
     if shape == "mesh":
-        import trimesh                                # 보간용(점→바리센트릭)
+        import trimesh  # 보간용(점→바리센트릭)
         mesh = ft["_mesh"]                            # 배치(transform 적용)된 trimesh
         pq = ft["_pq"]                               # trimesh ProximityQuery(BVH 캐시)
         faces, verts = mesh.faces, mesh.vertices

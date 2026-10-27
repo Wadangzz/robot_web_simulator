@@ -1,9 +1,9 @@
 """멀티로봇 라우터 — 사용 가능 로봇 목록 + 로봇별 상세(관절·한계·자세)."""
 import numpy as np
 from fastapi import APIRouter, HTTPException
+from motion_core.robots import robot_registry as reg
 
 from app import meshes_setup
-from app.core import robot_registry as reg
 
 router = APIRouter(prefix="/api", tags=["robots"])
 

@@ -1,1 +1,1 @@
-"""로봇 수학·모델 라이브러리 (core) — robot_math, ur5_model, paths."""
+"""앱 경로 규약 (paths). 로봇 수학·모델은 `motion_core.robots` 패키지로 이동했다."""

@@ -15,9 +15,9 @@ plant 는 동일한 numba RNE(forward_dynamics) — fd ~0.3ms 라 100Hz 루프�
   ※ 'safe' 는 '마법으로 성공'이 아니라 '안전하게 실패' — 나쁜 게인은 여전히 작업 실패.
 """
 import numpy as np
+from motion_core.robots import dynamics_fast as df
+from motion_core.robots.robot_math import SE3
 
-from app.core import dynamics_fast as df
-from app.core.robot_math import SE3
 from app.sim import OMEGA_MAX, THETA_MAX
 
 # 물리 적분 dt 상한(s). 감쇠항(Kd·θ̇)을 암시적으로 풀어(implicit) explicit Euler 의

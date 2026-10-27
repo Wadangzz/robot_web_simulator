@@ -92,10 +92,10 @@ cd backend  && uv run main.py  # dist 를 같은 출처로 서빙 (프런트+API
 ```text
 backend/
 ├─ app/
-│  ├─ core/        robot_math · ur5_model · robot_model · robot_registry · urdf_loader · paths
+│  ├─ core/        paths  (수학·모델 엔진은 motion-core 패키지로 분리)
 │  ├─ routers/     robot · robots · kinematics · programs · simulate · mesh
 │  ├─ controllers/ kinematics · programs · simulate
-│  ├─ sim.py       시뮬레이션 엔진(solve_ivp, 제어 루프) · dynamics_fast.py(numba RNE)
+│  ├─ sim.py       시뮬레이션 엔진(solve_ivp, 제어 루프)
 │  ├─ realism.py   plant≠controller 모델 불확실성 · mesh_store.py(업로드 메시)
 │  └─ models.py · schemas.py · db.py · meshes_setup.py · main.py
 ├─ tests/          RNE numpy↔numba parity (pytest)

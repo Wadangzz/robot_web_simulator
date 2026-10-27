@@ -2,12 +2,13 @@
 import numpy as np
 import trimesh
 from fastapi import HTTPException
+from motion_core.robots import robot_registry as registry
+from motion_core.robots.robot_math import SE3
 from sqlmodel import Session, select
-from app.core import robot_registry as registry
-from app.core.robot_math import SE3
-from app import sim, realism, mesh_store
+
+from app import mesh_store, realism, sim
 from app.models import Pose
-from app.schemas import RunRequest, ForceTask
+from app.schemas import ForceTask, RunRequest
 
 
 def run(req: RunRequest, session: Session):

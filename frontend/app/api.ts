@@ -209,7 +209,9 @@ export interface RunRequest {
   start?: number[]; // 프로그램 실행 출발 관절각(현재 자세)
   controller?: string; // pd | pid | computed_torque
   gains?: Record<string, number>;
-  traj_mode?: string; // joint(관절 quintic) | task(직교 직선)
+  traj_mode?: string; // joint(관절 quintic) | task(직교 직선) | joint_timeopt(토크 역산)
+  traj_tau_max?: number[]; // joint_timeopt: 관절 피크 토크(N·m), 필수
+  traj_dq_max?: number; // joint_timeopt: 관절 속도 한계(rad/s), 필수
   gravity_comp?: boolean;
   t_seg?: number;
   hold?: number;

@@ -103,6 +103,8 @@ def run(req: RunRequest, session: Session):
         gravity_comp=req.gravity_comp, t_seg=req.t_seg, hold=req.hold,
         plant=plant, ctrl=ctrl, disturbance=req.disturbance,
         traj_mode=req.traj_mode, friction=req.friction, tau_max=req.tau_max,
+        traj_tau_max=req.traj_tau_max,
+        traj_dq_max=req.traj_dq_max,
         control_rate=req.control_rate, noise=req.noise,
         noise_seed=req.noise_seed, force_task=force_task, robot=robot)
     if force_task is not None:                    # 3D 표면 렌더용 기하

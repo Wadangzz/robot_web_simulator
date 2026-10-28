@@ -12,6 +12,8 @@ manipulability·robot.n·robot.dyn_args·robot.gravity 를 통해 기구학·동
 run_simulation(robot=None) 이면 기본 로봇 UR5 를 레지스트리에서 가져온다(데모/하위호환).
 """
 import numpy as np
+from motion_core.loads import ArticulatedRobot
+from motion_core.profiles import InfeasiblePath, time_path
 from motion_core.robots import dynamics_fast as df  # numba JIT RNE (~14x)
 from motion_core.robots.robot_math import SE3, SO3, quintic_time_scaling
 from scipy.integrate import solve_ivp
@@ -54,13 +56,18 @@ def run_simulation(waypoints, controller="computed_torque", gains=None,
                    plant=None, ctrl=None, disturbance=None, traj_mode="joint",
                    friction=0.0, tau_max=0.0, control_rate=0.0, noise=0.0,
                    noise_seed=0, force_task=None, robot=None,
-                   null_obj=None, null_gain=1.0):
+                   null_obj=None, null_gain=1.0,
+                   traj_tau_max=None, traj_dq_max=0.0):
     """관절 경유점(rad)을 제어기로 순회. → {t, theta, tcp, error, torque, qdot, ...}.
 
     궤적생성(traj_mode)과 제어기는 직교(독립):
     - traj_mode='joint': 관절공간 quintic 보간(현행). 말단 경로는 곡선.
     - traj_mode='task' : 직교 SE(3) 직선보간 → IK 샘플 → θ_d. 말단 직선이지만
       특이점/작업영역밖에서 IK 실패·관절속도 폭발 시 그 지점까지 자르고 traj_error 보고.
+    - traj_mode='joint_timeopt': 같은 관절 직선 경로를 motion-core
+      time_path 로 타이밍: 구간 시간 T 를 t_seg 가 아니라 토크 한계
+      (traj_tau_max, N·m 관절별)·속도 한계(traj_dq_max, rad/s)에서 역산.
+      한계 미지정이면 traj_error 로 표면화.
     제어기는 모두 θ_d(t) 를 받으므로 어느 궤적이든 동일하게 추종한다.
 
     controller 가 속도제어/어드미턴스면 기구학 plant, 그 외는 동역학 plant 로 분기.
@@ -69,7 +76,8 @@ def run_simulation(waypoints, controller="computed_torque", gains=None,
     gains = gains or {}
     robot = robot if robot is not None else _default_robot()
     WP = _prep_waypoints(waypoints)
-    ref, T, traj_error = _build_ref(WP, t_seg, hold, traj_mode, robot)
+    ref, T, traj_error = _build_ref(WP, t_seg, hold, traj_mode, robot,
+                                    traj_tau_max, traj_dq_max)
     if T <= 0:                                  # 궤적 생성 자체 실패(첫 점부터 불가)
         return _empty_result(WP, traj_error, robot)
 
@@ -129,15 +137,57 @@ def _se3_straight(X0, X1, s):
     return Td
 
 
-def _build_ref(WP, t_seg, hold, traj_mode, robot):
+def _make_ref_timeopt(WP, hold, robot, tau_max, dq_max):
+    """경유점 → 토크 한계 역산 타이밍 ref(t). (ref, T, traj_error) 반환.
+
+    경로는 quintic 모드와 같은 관절공간 직선, 타이밍만 바뀐다: 구간
+    시간을 사람이 주는 t_seg 대신 motion-core `time_path` 가 토크·속도
+    예산에서 역산한다(보수적 경계라 시간최적 아님, path_timing.py 참조).
+    토크 한계는 URDF effort 가 아니라 호출자가 명시한다(관절별/스칼라).
+    """
+    N = robot.n
+    if tau_max is None or not np.all(np.asarray(tau_max, dtype=float) > 0):
+        return None, 0.0, "토크 한계(traj_tau_max) 미지정: timeopt 불가"
+    if dq_max is None or dq_max <= 0:
+        return None, 0.0, "속도 한계(traj_dq_max) 미지정: timeopt 불가"
+    tau = np.broadcast_to(np.asarray(tau_max, dtype=float), (N,))
+    # rated(RMS) 한계는 time_path 가 쓰지 않는다 — peak 와 같은 값으로 채운다.
+    load = ArticulatedRobot(robot, max_torque=tau, rated_torque=tau)
+    try:
+        timings = [time_path(load, WP[k], WP[k + 1], dq_max=dq_max)
+                   for k in range(len(WP) - 1)]
+    except InfeasiblePath as e:
+        return None, 0.0, f"토크 한계로 실행 불가: {e}"
+    starts = np.r_[0.0, np.cumsum([tm.duration + hold for tm in timings])]
+    T = float(starts[-1])
+
+    def ref(t):
+        k = min(max(int(np.searchsorted(starts, t, side="right")) - 1, 0),
+                len(timings) - 1)
+        q, dq, ddq = timings[k].sample(np.r_[t - starts[k]])
+        return q[0], dq[0], ddq[0]
+
+    return ref, T, None
+
+
+def _build_ref(WP, t_seg, hold, traj_mode, robot, traj_tau_max=None,
+               traj_dq_max=0.0):
     """궤적 생성 → (ref(t)→(θ_d,θ̇_d,θ̈_d), T, traj_error).
 
     joint: 관절 quintic(해석적, 항상 실행가능).
+    joint_timeopt: 같은 경로, 토크 한계 역산 타이밍(_make_ref_timeopt).
     task : 직교 SE(3) 직선보간 → IK 샘플(precompute) → θ_d 격자 보간.
            IK 비수렴(작업영역밖) 또는 관절속도 폭발(특이점) 시 그 지점까지 자르고
            traj_error 를 채운다(='실행 불가'를 정직하게 표면화).
     """
     N = robot.n
+    if traj_mode == "joint_timeopt":
+        ref, T, traj_error = _make_ref_timeopt(WP, hold, robot,
+                                               traj_tau_max, traj_dq_max)
+        if ref is None:
+            def ref(_t):
+                return WP[0].copy(), np.zeros(N), np.zeros(N)
+        return ref, T, traj_error
     if traj_mode != "task":
         ref, T = _make_ref(WP, t_seg, hold, robot)
         return ref, T, None

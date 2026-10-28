@@ -39,3 +39,26 @@ def test_simulation_closes_the_loop():
     assert not out['diverged']
     assert np.all(np.isfinite(out['torque']))
     assert np.allclose(out['theta'][-1], target, atol=1e-2)
+
+
+def test_timeopt_trajectory_closes_the_loop():
+    """joint_timeopt: T 를 토크 한계에서 역산한 궤적도 폐루프로 수렴한다."""
+    robot = reg.get_robot('ur5')
+    target = robot.ready + 0.2
+    out = run_simulation([robot.ready.tolist(), target.tolist()],
+                         controller='computed_torque', hz=20, hold=0.2,
+                         traj_mode='joint_timeopt',
+                         traj_tau_max=[150, 150, 150, 28, 28, 28],
+                         traj_dq_max=np.pi)
+    assert out['traj_error'] is None
+    assert not out['diverged']
+    assert np.allclose(out['theta'][-1], target, atol=1e-2)
+
+
+def test_timeopt_without_limits_reports_error():
+    """한계 미지정이면 숫자를 지어내지 않고 traj_error 로 표면화한다."""
+    robot = reg.get_robot('ur5')
+    out = run_simulation([robot.ready.tolist(), (robot.ready + 0.2).tolist()],
+                         traj_mode='joint_timeopt')
+    assert out['traj_error'] and 'traj_tau_max' in out['traj_error']
+    assert out['t'] == []

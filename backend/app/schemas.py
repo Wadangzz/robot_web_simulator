@@ -85,7 +85,9 @@ class RunRequest(SQLModel):
     start: list[float] | None = None             # 프로그램 실행 출발 관절각(현재 자세), 없으면 ready
     controller: str = "computed_torque"          # pd | pid | computed_torque
     gains: dict[str, float] = {}
-    traj_mode: str = "joint"                      # joint(관절 quintic) | task(직교 직선)
+    traj_mode: str = "joint"                      # joint | task | joint_timeopt
+    traj_tau_max: list[float] | None = None       # timeopt: 관절 피크토크 N·m
+    traj_dq_max: float = 0.0                      # timeopt: 속도한계 rad/s
     gravity_comp: bool = True
     t_seg: float = 1.2
     hold: float = 0.6

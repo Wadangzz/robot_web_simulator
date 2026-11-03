@@ -342,8 +342,19 @@ export default function App() {
   const setJoints = useSim((s) => s.setJoints);
   const controller = useSim((s) => s.controller);
   const setController = useSim((s) => s.setController);
-  const trajMode = useSim((s) => s.trajMode); // joint | task(직교 직선)
+  const trajMode = useSim((s) => s.trajMode); // joint | task(직교 직선) | joint_timeopt
   const setTrajMode = useSim((s) => s.setTrajMode);
+  // joint_timeopt 한계 — 백엔드 필수 입력(관절별 토크 N·m 배열, 속도 rad/s 스칼라)
+  const trajTauMax = useSim((s) => s.trajTauMax);
+  const setTrajTauMax = useSim((s) => s.setTrajTauMax);
+  const trajDqMax = useSim((s) => s.trajDqMax);
+  const setTrajDqMax = useSim((s) => s.setTrajDqMax);
+  const setTrajTauAxis = (index: number, value: number) =>
+    setTrajTauMax((prev) => {
+      const a = meta.map((_, k) => prev[k] ?? 0); // 관절 수로 패딩
+      a[index] = value;
+      return a;
+    });
   const gains = useSim((s) => s.gains);
   const setGains = useSim((s) => s.setGains);
   const autoTune = useSim((s) => s.autoTune);
@@ -629,6 +640,14 @@ export default function App() {
         controller,
         gains,
         traj_mode: trajMode,
+        // timeopt 한계는 모드일 때만 실어 보낸다. 빈 배열은 미지정으로 보내
+        // 백엔드 traj_error("미지정: timeopt 불가")가 그대로 표면화되게 한다.
+        ...(trajMode === 'joint_timeopt'
+          ? {
+              traj_tau_max: trajTauMax.length > 0 ? trajTauMax : undefined,
+              traj_dq_max: trajDqMax,
+            }
+          : {}),
         payload,
         model_scale: modelScale,
         disturbance: push,
@@ -852,6 +871,10 @@ export default function App() {
           onControllerChange={setController}
           trajMode={trajMode}
           onTrajModeChange={setTrajMode}
+          trajTauMax={trajTauMax}
+          onTrajTauMaxChange={setTrajTauAxis}
+          trajDqMax={trajDqMax}
+          onTrajDqMaxChange={setTrajDqMax}
           gains={gains}
           onGainChange={setGain}
           autoTune={autoTune}

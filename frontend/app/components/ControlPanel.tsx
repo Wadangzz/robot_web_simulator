@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { POLE_PLACE, type ControllerSpec, type JointMeta } from '@/api';
 
 interface Props {
@@ -21,6 +22,10 @@ interface Props {
   onControllerChange: (value: string) => void;
   trajMode: string;
   onTrajModeChange: (value: string) => void;
+  trajTauMax: number[]; // joint_timeopt 관절별 토크 한계(N·m), 0=미입력
+  onTrajTauMaxChange: (index: number, value: number) => void;
+  trajDqMax: number; // joint_timeopt 속도 한계(rad/s), 0=미입력
+  onTrajDqMaxChange: (value: number) => void;
   gains: Record<string, number>;
   onGainChange: (key: string, value: number) => void;
   autoTune: boolean;
@@ -106,6 +111,10 @@ export default function ControlPanel({
   onControllerChange,
   trajMode,
   onTrajModeChange,
+  trajTauMax,
+  onTrajTauMaxChange,
+  trajDqMax,
+  onTrajDqMaxChange,
   gains,
   onGainChange,
   autoTune,
@@ -182,9 +191,66 @@ export default function ControlPanel({
               <SelectContent>
                 <SelectItem value='joint'>관절공간 (곡선)</SelectItem>
                 <SelectItem value='task'>직교 직선 (task)</SelectItem>
+                <SelectItem value='joint_timeopt'>
+                  관절 토크역산 (timeopt)
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {/* timeopt 한계 — 백엔드 필수 입력(URDF effort 안 씀). 미입력(0)이면
+              실행 시 traj_error 로 "실행 불가"가 그대로 표시된다. */}
+          {trajMode === 'joint_timeopt' && (
+            <div className='bg-muted/50 space-y-3 rounded-md p-2.5'>
+              <p className='text-muted-foreground text-xs font-medium'>
+                토크·속도 한계 (필수)
+              </p>
+              <div className='space-y-1.5'>
+                <Label className='text-muted-foreground text-xs'>
+                  관절 토크 한계 (N·m)
+                </Label>
+                <div className='grid grid-cols-3 gap-1.5'>
+                  {meta.map((m, i) => (
+                    <div key={m.name} className='space-y-0.5'>
+                      <span className='text-muted-foreground text-[11px]'>
+                        J{i + 1}
+                      </span>
+                      <Input
+                        type='number'
+                        min={0}
+                        step={1}
+                        value={trajTauMax[i] ?? 0}
+                        disabled={running}
+                        onChange={(e) =>
+                          onTrajTauMaxChange(i, parseFloat(e.target.value) || 0)
+                        }
+                        className='h-8'
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className='space-y-1.5'>
+                <Label className='text-muted-foreground text-xs'>
+                  속도 한계 (rad/s)
+                </Label>
+                <Input
+                  type='number'
+                  min={0}
+                  step={0.1}
+                  value={trajDqMax}
+                  disabled={running}
+                  onChange={(e) =>
+                    onTrajDqMaxChange(parseFloat(e.target.value) || 0)
+                  }
+                  className='h-8'
+                />
+              </div>
+              <p className='text-muted-foreground text-[11px]'>
+                0 = 미지정. 미지정으로 실행하면 궤적 생성 불가 에러가 표시된다.
+              </p>
+            </div>
+          )}
 
           {/* 자동 튜닝(극배치) — 관절 2차계용. 속도제어(1차계)·임피던스엔 N/A 라 숨김 */}
           {POLE_PLACE.includes(controller) && (

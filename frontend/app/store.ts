@@ -28,6 +28,8 @@ interface SimState {
   robotId: string;
   controller: string;
   trajMode: string;
+  trajTauMax: number[]; // joint_timeopt 관절별 토크 한계(N·m), []=미입력
+  trajDqMax: number; // joint_timeopt 속도 한계(rad/s), 0=미입력
   gains: Record<string, number>;
   autoTune: boolean;
   targetTs: number;
@@ -48,6 +50,8 @@ interface SimState {
   setRobotId: (v: Updater<string>) => void;
   setController: (v: Updater<string>) => void;
   setTrajMode: (v: Updater<string>) => void;
+  setTrajTauMax: (v: Updater<number[]>) => void;
+  setTrajDqMax: (v: Updater<number>) => void;
   setGains: (v: Updater<Record<string, number>>) => void;
   setAutoTune: (v: Updater<boolean>) => void;
   setTargetTs: (v: Updater<number>) => void;
@@ -72,6 +76,8 @@ export const useSim = create<SimState>()(
       robotId: 'ur5',
       controller: 'computed_torque',
       trajMode: 'joint',
+      trajTauMax: [],
+      trajDqMax: 0,
       gains: {},
       autoTune: false,
       targetTs: 0.6,
@@ -100,6 +106,9 @@ export const useSim = create<SimState>()(
       setController: (v) =>
         set((s) => ({ controller: apply(s.controller, v) })),
       setTrajMode: (v) => set((s) => ({ trajMode: apply(s.trajMode, v) })),
+      setTrajTauMax: (v) =>
+        set((s) => ({ trajTauMax: apply(s.trajTauMax, v) })),
+      setTrajDqMax: (v) => set((s) => ({ trajDqMax: apply(s.trajDqMax, v) })),
       setGains: (v) => set((s) => ({ gains: apply(s.gains, v) })),
       setAutoTune: (v) => set((s) => ({ autoTune: apply(s.autoTune, v) })),
       setTargetTs: (v) => set((s) => ({ targetTs: apply(s.targetTs, v) })),
@@ -126,6 +135,8 @@ export const useSim = create<SimState>()(
         robotId: s.robotId,
         controller: s.controller,
         trajMode: s.trajMode,
+        trajTauMax: s.trajTauMax,
+        trajDqMax: s.trajDqMax,
         gains: s.gains,
         autoTune: s.autoTune,
         targetTs: s.targetTs,

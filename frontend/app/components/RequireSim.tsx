@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { checkAuth, login } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,12 +58,6 @@ export default function RequireSim({
             <Button type='submit' className='w-full' disabled={busy || !key}>
               {busy ? '확인 중…' : '입장'}
             </Button>
-            <Link
-              to='/slides'
-              className='text-muted-foreground hover:text-foreground block text-center text-xs'
-            >
-              슬라이드만 보기 →
-            </Link>
           </form>
         </CardContent>
       </Card>

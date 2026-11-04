@@ -6,7 +6,6 @@ import {
   useState,
   type ComponentRef,
 } from 'react';
-import { Link } from 'react-router-dom';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import {
   OrbitControls,
@@ -743,14 +742,6 @@ export default function App() {
           react-three-fiber · urdf-loader · FastAPI
         </p>
       </header>
-
-      {/* 발표자료 링크 — 우하단(상단은 패널에 가려짐) */}
-      <Link
-        to='/slides'
-        className='bg-card/95 supports-[backdrop-filter]:bg-card/80 text-primary pointer-events-auto absolute right-4 bottom-4 z-20 inline-block rounded-lg border px-3 py-1.5 text-sm shadow-sm backdrop-blur hover:underline'
-      >
-        📊 발표자료 →
-      </Link>
 
       {/* 로봇 선택 (멀티로봇) — 상단 중앙. 바꾸면 메시·기구학·동역학이 그 로봇으로 전환 */}
       <div className='absolute top-4 left-1/2 z-20 -translate-x-1/2'>

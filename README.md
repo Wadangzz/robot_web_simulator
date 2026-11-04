@@ -36,7 +36,6 @@
 - **하이브리드 컨투어** — 곡면(평면/원기둥/구) 또는 업로드 메시(STL/OBJ)에 마우스로 경로를 그려 일정 힘으로 추종
 
 **그 외**
-- 발표 슬라이드(`/slides`) — 관절~제어 개념을 실제 3D 로봇과 함께 설명
 - 단일 포트 서빙 + 선택적 로그인 인증(`SIM_KEY`)
 
 ---
@@ -73,16 +72,15 @@ cd frontend && pnpm build      # → frontend/dist
 cd backend  && uv run main.py  # dist 를 같은 출처로 서빙 (프런트+API 한 포트)
 ```
 
-- 접근 제어: `backend/.env`의 `SIM_KEY` 설정 시 시뮬 실행·쓰기에 로그인 필요(슬라이드·읽기는 공개). 빈 값이면 인증 OFF.
+- 접근 제어: `backend/.env`의 `SIM_KEY` 설정 시 시뮬 실행·쓰기에 로그인 필요(읽기는 공개). 빈 값이면 인증 OFF.
 - LAN 공유: `HOST`/`PORT` 환경변수(기본 `0.0.0.0:8500`).
 
 ### 라우트
 
 | 경로 | 내용 |
 |---|---|
-| `/` | `/slides` 로 리다이렉트 |
+| `/` | `/simulation` 으로 리다이렉트 |
 | `/simulation` | 시뮬레이터 (인증 보호 대상) |
-| `/slides` | 발표 슬라이드 (공개) |
 | `/docs` | FastAPI Swagger |
 
 ---
@@ -102,7 +100,7 @@ backend/
 └─ pyproject.toml · uv.lock
 
 frontend/app/
-├─ components/  RobotView · ControlPanel · PoseEditor · ProgramList · Plots · Slides · WallPlane …
+├─ components/  RobotView · ControlPanel · PoseEditor · ProgramList · Plots · WallPlane …
 ├─ api.ts · store.ts · root.tsx · main.web.tsx
 ```
 

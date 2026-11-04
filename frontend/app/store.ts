@@ -1,9 +1,8 @@
 /**
  * 시뮬레이터 전역 상태 (zustand + persist).
  *
- * 발표(/slides) ↔ 시뮬레이터(/simulation) 라우트를 오가면 App 이 언마운트돼 useState 가
- * 날아간다. 여기 둔 상태는 React 트리 밖에 살아 라우트 전환에도 유지되고,
- * persist(localStorage) 로 새로고침에도 보존된다.
+ * 라우트를 오가면 App 이 언마운트돼 useState 가 날아간다. 여기 둔 상태는 React 트리
+ * 밖에 살아 라우트 전환에도 유지되고, persist(localStorage) 로 새로고침에도 보존된다.
  *
  * setter 는 useState 와 동일한 시그니처(값 또는 갱신함수)라, 컴포넌트의 호출부
  * (`setX(v)` / `setX(prev => ...)`)를 그대로 둔 채 선언만 store 셀렉터로 바꾸면 된다.
@@ -45,7 +44,6 @@ interface SimState {
   drawnPath: number[][];
   camPos: number[]; // OrbitControls 카메라 위치 (줌·회전)
   camTarget: number[]; // OrbitControls 타깃 (팬)
-  slide: number; // 발표 슬라이드 현재 페이지 (시뮬↔발표 와리가리 유지)
 
   setRobotId: (v: Updater<string>) => void;
   setController: (v: Updater<string>) => void;
@@ -67,7 +65,6 @@ interface SimState {
   setDrawnPath: (v: Updater<number[][]>) => void;
   setCamPos: (v: Updater<number[]>) => void;
   setCamTarget: (v: Updater<number[]>) => void;
-  setSlide: (v: Updater<number>) => void;
 }
 
 export const useSim = create<SimState>()(
@@ -100,7 +97,6 @@ export const useSim = create<SimState>()(
       drawnPath: [],
       camPos: [1.3, -1.3, 0.9],
       camTarget: [0, 0, 0.4],
-      slide: 0,
 
       setRobotId: (v) => set((s) => ({ robotId: apply(s.robotId, v) })),
       setController: (v) =>
@@ -126,7 +122,6 @@ export const useSim = create<SimState>()(
       setDrawnPath: (v) => set((s) => ({ drawnPath: apply(s.drawnPath, v) })),
       setCamPos: (v) => set((s) => ({ camPos: apply(s.camPos, v) })),
       setCamTarget: (v) => set((s) => ({ camTarget: apply(s.camTarget, v) })),
-      setSlide: (v) => set((s) => ({ slide: apply(s.slide, v) })),
     }),
     {
       name: 'ur5-sim',
@@ -152,7 +147,6 @@ export const useSim = create<SimState>()(
         drawnPath: s.drawnPath,
         camPos: s.camPos,
         camTarget: s.camTarget,
-        slide: s.slide,
       }),
     },
   ),

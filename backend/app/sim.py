@@ -239,8 +239,8 @@ def _build_ref(WP, t_seg, hold, traj_mode, robot, traj_tau_max=None,
 
 class _SolShim:
     """이산 ZOH 적분 결과를 solve_ivp 의 sol(.t/.y/.status)과 호환되게 담는 객체.
-    + tau_log(샘플별 실제 인가 토크, 노이즈 chatter 포함)."""
-    __slots__ = ("t", "y", "status", "tau_log", "diverged", "settle_t")
+    + cmd_log(샘플별 명령 토크 = 포화 전, 노이즈 chatter 포함)."""
+    __slots__ = ("t", "y", "status", "cmd_log", "diverged", "settle_t")
 
 
 def _empty_result(WP, traj_error, robot):
@@ -367,10 +367,12 @@ def _run_torque(WP, ref, T, controller, gains, gravity_comp, hz,
         f_b = -robot.fk(th)[:3, :3].T @ dist    # base→EE 프레임, 부호 반전
         return np.concatenate([np.zeros(3), f_b])  # [모멘트; 힘] (EE 프레임)
 
+    def clip(tau):
+        return np.clip(tau, -tau_max, tau_max) if tau_max > 0 else tau
+
     def applied(th, dth, th_d, dth_d, ddth_d, I):
         """액추에이터가 실제 내는 토크 = 명령 토크에 포화 적용(plot 도 이 값)."""
-        tau = torque(th, dth, th_d, dth_d, ddth_d, I)
-        return np.clip(tau, -tau_max, tau_max) if tau_max > 0 else tau
+        return clip(torque(th, dth, th_d, dth_d, ddth_d, I))
 
     # 제어 모드: control_rate=0 → 연속(이상화, 빠른 Radau) / >0 → 이산 ZOH(현실).
     # 노이즈는 이산 샘플링이 필요하므로 control_rate=0 이면 기본 제어율로 이산화한다.
@@ -421,7 +423,7 @@ def _run_torque(WP, ref, T, controller, gains, gravity_comp, hz,
         if s.settle_t is not None and len(s.t):     # 정착(거의 정지) 프레임을 끝에 추가
             s.t = np.append(s.t, s.settle_t)        # (t_eval 은 이벤트 직전까지만 반환)
             s.y = np.column_stack([s.y, s.y_events[1][0]])
-        s.tau_log = None                            # 패킹 때 applied()로 재계산
+        s.cmd_log = None                            # 패킹 때 torque()로 재계산
         return s
 
     def _zoh(rate):
@@ -436,7 +438,7 @@ def _run_torque(WP, ref, T, controller, gains, gravity_comp, hz,
             n_vel = 5.0 * noise * rng.standard_normal((n_ticks, N))
         th, dth, I = WP[0].copy(), np.zeros(N), np.zeros(N)
         excited_z = not has_dist            # 외란 시 흔들린 뒤에만 정착 인정
-        ts, THl, DTHl, IIl, taul = [], [], [], [], []
+        ts, THl, DTHl, IIl, cmdl = [], [], [], [], []
         diverged = False
         settle_t = None
         for k in range(n_ticks):
@@ -444,7 +446,8 @@ def _run_torque(WP, ref, T, controller, gains, gravity_comp, hz,
             th_d, dth_d, ddth_d = ref(t)
             thm = th + n_pos[k] if noise > 0 else th    # 센서 측정값(노이즈 포함)
             dthm = dth + n_vel[k] if noise > 0 else dth
-            tau = applied(thm, dthm, th_d, dth_d, ddth_d, I)   # ZOH: h 동안 유지
+            cmd = torque(thm, dthm, th_d, dth_d, ddth_d, I)    # 포화 전 명령
+            tau = clip(cmd)                          # ZOH: h 동안 유지
 
             def f(x):                               # plant: tau 고정, 마찰 연속
                 q, qd = x[:N], x[N:]
@@ -474,7 +477,7 @@ def _run_torque(WP, ref, T, controller, gains, gravity_comp, hz,
                     rest = np.max(np.abs(qdd)) < ACC_TOL
             if k % out_every == 0 or rest:
                 ts.append(t); THl.append(th.copy()); DTHl.append(dth.copy())
-                IIl.append(I.copy()); taul.append(tau.copy())
+                IIl.append(I.copy()); cmdl.append(cmd.copy())
             if rest:
                 settle_t = t
                 break
@@ -486,7 +489,7 @@ def _run_torque(WP, ref, T, controller, gains, gravity_comp, hz,
         s.status = 1 if diverged else 0
         s.diverged = diverged
         s.settle_t = settle_t
-        s.tau_log = np.array(taul) if ts else np.zeros((0, N))
+        s.cmd_log = np.array(cmdl) if ts else np.zeros((0, N))
         return s
 
     sol = _zoh(rate) if rate > 0 else _continuous()
@@ -513,16 +516,20 @@ def _run_torque(WP, ref, T, controller, gains, gravity_comp, hz,
                           if settle_time is not None and len(err) else None)
     idx = _keep_idx(sol, settle_time, diverged, T)
 
-    tcp, error, torque_log = [], [], []
+    tcp, error, torque_log, cmd_log = [], [], [], []
     for i in idx:
         tcp.append(robot.fk(TH[i])[:3, 3].tolist())
         error.append(float(err[i]))
-        if sol.tau_log is not None:                 # 이산: 기록된 ZOH 토크(노이즈 포함)
-            torque_log.append([float(v) for v in sol.tau_log[i]])
-        else:                                       # 연속: applied()로 재계산
+        if sol.cmd_log is not None:             # 이산: 기록된 ZOH 명령
+            cmd = np.asarray(sol.cmd_log[i], dtype=float)
+        else:                                       # 연속: torque()로 재계산
             th_d, dth_d, ddth_d = ref(sol.t[i])
-            torque_log.append([float(v)
-                               for v in applied(TH[i], DTH[i], th_d, dth_d, ddth_d, II[i])])
+            cmd = torque(TH[i], DTH[i], th_d, dth_d, ddth_d, II[i])
+        torque_log.append([float(v) for v in clip(cmd)])
+        # 포화 전 명령은 한계가 있을 때만 넣는다. 한계가 없으면 위와
+        # 같은 값이라 payload 만 늘린다.
+        if tau_max > 0:
+            cmd_log.append([float(v) for v in cmd])
 
     return {
         "t": sol.t[idx].tolist(),
@@ -530,6 +537,9 @@ def _run_torque(WP, ref, T, controller, gains, gravity_comp, hz,
         "tcp": tcp,
         "error": error,
         "torque": torque_log,
+        # 포화 '전' 명령 토크. 포화 판정(V3)은 클립된 계열로는 셀 것을 못 센다:
+        # 한계에 닿은 샘플과 잘린 샘플이 같은 수가 된다. tau_max=0 이면 빈 배열.
+        "torque_cmd": cmd_log,
         "qdot": [],
         "waypoints_tcp": [robot.fk(w)[:3, 3].tolist() for w in WP],
         "settle_time": settle_time,

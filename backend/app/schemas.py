@@ -109,6 +109,7 @@ class RunResponse(SQLModel):
     tcp: list[list[float]]
     error: list[float]
     torque: list[list[float]]                 # 토크제어 출력(N·m). 속도제어 시 빈 배열
+    torque_cmd: list[list[float]] = []       # 포화 전 명령 토크(N·m)
     qdot: list[list[float]] = []             # 속도제어 출력 commanded 관절속도(rad/s)
     ee_pose: list[list[float]] = []          # 프레임별 EE pose [x,y,z,qx,qy,qz,qw] (재생 중 직교좌표 표시)
     sigma_min: list[float] = []              # 프레임별 최소특이값 (재생 중 manipulability 표시)
